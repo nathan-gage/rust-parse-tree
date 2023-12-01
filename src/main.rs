@@ -21,7 +21,7 @@ enum Token {
 
 /* grammars
 
-expr   = term { ("+" | "-"), expr };
+expr   = term { ("+" | "-"), term };
 term   = "(", expr, ")" | number;
 number = digit, { digit };
 digit  = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
@@ -41,7 +41,7 @@ fn parse_expr(tokens: &[Token]) -> Result<(Expr, &[Token]), ParseError> {
     match remaining.first() {
         // addition
         Some(Token::Plus) => {
-            let (other, remaining) = parse_expr(&remaining[1..])?;
+            let (other, remaining) = parse_term(&remaining[1..])?;
             Ok((Expr::Add(Box::new(term), Box::new(other)), remaining))
         }
 
@@ -131,29 +131,56 @@ fn tokenize(input: &String) -> Result<Vec<Token>, ParseError> {
         .collect::<Result<Vec<Token>, ParseError>>()
 }
 
-fn parse(input: &String) -> Result<i32, ParseError> {
+fn parse(input: &String) -> Result<Expr, ParseError> {
     let tokens = tokenize(input)?;
     let (expr, remaining) = parse_expr(&tokens)?;
 
-    dbg!(expr);
-
-    if !remaining.is_empty() {
-        dbg!(remaining);
-        return Err(ParseError::UnexpectedEndOfInput);
+    match remaining.first() {
+        Some(token) => Err(ParseError::Expected {
+            expected: "end of input".to_string(),
+            found: *token,
+        }),
+        None => Ok(expr),
     }
+}
 
-    Ok(0)
+fn evaluate(expr: &Expr) -> i32 {
+    match expr {
+        Expr::Add(lhs, rhs) => {
+            dbg!(expr);
+            let lhs = evaluate(lhs);
+            let rhs = evaluate(rhs);
+
+            let result = lhs + rhs;
+            dbg!(lhs, rhs, lhs + rhs);
+            result
+        }
+        Expr::Sub(lhs, rhs) => {
+            dbg!(expr);
+            let lhs = evaluate(lhs);
+            let rhs = evaluate(rhs);
+
+            let result = lhs - rhs;
+            dbg!(lhs, rhs, lhs - rhs);
+            result
+        }
+        Expr::Number(number) => *number,
+    }
 }
 
 fn main() {
     // get all chars after the program name
     let input = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
-
-    println!("input: {}", input);
+    dbg!(&input);
 
     match parse(&input) {
-        // Ok(result) => println!("{}", result),
+        Ok(ref tree) => {
+            dbg!(tree);
+            let result = evaluate(tree);
+            dbg!(result);
+        }
         Err(err) => println!("error: {:?}", err),
-        _ => {}
     }
 }
+
+// broken: (123 + 213) - 456 + 123
